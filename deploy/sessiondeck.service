@@ -1,0 +1,26 @@
+# systemd unit for sessiondeck. Copy to /etc/systemd/system/sessiondeck.service,
+# adjust User, WorkingDirectory and EnvironmentFile, then:
+#   systemctl daemon-reload && systemctl enable --now sessiondeck
+[Unit]
+Description=sessiondeck, web cockpit for Claude Code sessions
+After=network.target
+
+[Service]
+Type=simple
+# Run as the same user that runs Claude Code (recommended, no root needed).
+User=youruser
+Group=youruser
+WorkingDirectory=/home/youruser/sessiondeck
+EnvironmentFile=/home/youruser/sessiondeck/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+# ttyd and tmux must outlive a service restart, so sessions survive updates.
+KillMode=process
+# Hardening that does not get in the way of tmux or Claude Code.
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

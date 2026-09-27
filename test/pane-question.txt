@@ -1,0 +1,25 @@
+ ▐▛███▜▌   Claude Code
+▝▜█████▛▘  Sonnet
+  ▘▘ ▝▝    ~/projects/demo-app
+
+❯ Use AskUserQuestion with exactly one question: "Which color should the button have?"
+  Header "Color", options: Red (warm), Blue (cool), Green (fresh).
+────────────────────────────────────────────────────────────────────────────────
+ ☐ Color
+
+Which color should the button have?
+
+❯ 1. Red (warm)
+     A warm, energetic tone
+  2. Blue (cool)
+     A cool, calm tone
+  3. Green (fresh)
+     A fresh, natural tone
+  4. Type something.
+────────────────────────────────────────────────────────────────────────────────
+  5. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+
+
+

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- README: short demo animation of a question card being answered from the deck.
+
 ## 1.0.0
 
 First public release.

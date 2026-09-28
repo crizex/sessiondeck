@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- README: the diagram is readable on GitHub again, labels no longer get cut off inside their boxes.
+
 ## 1.0.1
 
 - README: short demo animation of a question card being answered from the deck.

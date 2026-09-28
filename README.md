@@ -57,11 +57,12 @@ needs you is lit amber.
 ## How it works
 
 ```mermaid
+%%{init: {"flowchart": {"padding": 20}}}%%
 flowchart LR
-    B[Browser or phone] -- HTTPS --> P[Reverse proxy<br><sub>TLS, optional client certs</sub>]
-    P -- HTTP, localhost --> S[sessiondeck<br><sub>Node + Express</sub>]
+    B[Browser or phone] -- HTTPS --> P["Reverse proxy<br>TLS, optional client certs"]
+    P -- HTTP, localhost --> S["sessiondeck<br>Node + Express"]
     S -- "new-session, capture-pane, send-keys" --> T[tmux]
-    S -- proxy, per-session credential --> Y[ttyd<br><sub>127.0.0.1 only</sub>]
+    S -- proxy, per-session credential --> Y["ttyd<br>127.0.0.1 only"]
     Y -- attach --> T
     T --> C[claude]
 ```

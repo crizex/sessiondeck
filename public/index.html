@@ -59,6 +59,14 @@
 .hints{margin:0;padding:0;list-style:none;display:grid;gap:10px;font-size:13px;color:var(--ink-2)}
 .hints li{display:flex;gap:10px;align-items:baseline}
 .hints .kbd{flex:none}
+.upd{margin:0 0 12px;padding:0;list-style:none;display:grid;gap:6px;font-size:13px;color:var(--ink-2)}
+.upd:empty{display:none}
+.upd li{display:flex;justify-content:space-between;gap:10px}
+.upd li span:last-child{font:12px var(--mono);color:var(--ink-3);text-align:right;overflow-wrap:anywhere}
+.upd.log li span:last-child{color:var(--ink-2)}
+#upd-k{display:block;font-size:12px;color:var(--ink-3);margin-bottom:10px}
+#upd-go{width:100%;justify-content:center}
+[hidden]{display:none!important}
 
 @media (max-width:1100px){
   .grid{grid-template-columns:1fr}
@@ -115,6 +123,13 @@
         <div class="meter"><div class="row"><span>CPU</span><b class="num" id="cpu-v">·</b></div><svg class="spark" viewBox="0 0 300 34" preserveAspectRatio="none" id="cpu" role="img" aria-label="CPU load over the last 30 minutes"></svg></div>
         <div class="meter"><div class="row"><span>Memory</span><b class="num" id="ram-v">·</b></div><div class="track"><i id="ram-t" style="transform:scaleX(0)"></i></div><small id="ram-k"></small></div>
         <div class="meter"><div class="row"><span>Disk</span><b class="num" id="disk-v">·</b></div><div class="track"><i id="disk-t" style="transform:scaleX(0)"></i></div><small id="disk-k"></small></div>
+      </div>
+      <div class="panel" aria-live="polite">
+        <h4>Updates</h4>
+        <small id="upd-k">not checked yet</small>
+        <ul class="upd" id="upd-list"></ul>
+        <ul class="upd log" id="upd-log"></ul>
+        <button type="button" class="btn primary" id="upd-go" data-cmd="updates-apply" hidden></button>
       </div>
       <div class="panel">
         <h4>Shortcuts</h4>
@@ -403,11 +418,37 @@
     } catch {}
   }
 
+  // ---------- Updates for Claude Code and plugins ----------
+  let updates = { items: [] };
+  async function loadUpdates() {
+    try { updates = await api('/api/updates'); } catch { return; }
+    const out = updates.items.filter(i => i.outdated), run = updates.running;
+    $('#upd-k').textContent = run ? 'checking, installing can take a few minutes'
+      : !updates.checkedAt ? 'not checked yet'
+      : (out.length ? `${out.length} available` : 'everything up to date') + ` · checked ${hm(updates.checkedAt)}`;
+    $('#upd-list').innerHTML = out.map(i => `<li><span>${esc(i.name)}</span><span>${esc(i.current)} → ${esc(i.latest)}</span></li>`).join('');
+    $('#upd-log').innerHTML = (updates.log || []).map(l => `<li><span>${esc(l)}</span></li>`).join('');
+    const go = $('#upd-go');
+    go.hidden = !out.length; go.disabled = !!run;
+    go.textContent = `Install ${out.length} ${out.length === 1 ? 'update' : 'updates'}`;
+  }
+  async function updateRun(what) {
+    try {
+      await api('/api/updates/' + what, { method: 'POST' });
+      toast(what === 'apply' ? 'Installing updates' : 'Checking for updates');
+    } catch (e) { toast(e.message, true); }
+    loadUpdates();
+    // Poll until the run is done.
+    const t = setInterval(async () => { await loadUpdates(); if (!updates.running) clearInterval(t); }, 3000);
+  }
+
   // ---------- Commands ----------
   const commands = () => [
     { g: 'Sessions', t: 'Start new session', k: 'N', f: newSession, c: 'var(--teal)' },
     ...sessions.map(s => ({ g: 'Sessions', t: `Jump to ${s.name}`, k: s.project || 'projects root', f: () => jump(s.id), c: 'var(--teal)' })),
     ...sessions.map(s => ({ g: 'Terminals', t: `Open ${s.name} in the browser`, k: 'terminal', f: () => terminal(s.id), c: 'var(--amber)' })),
+    ...(updates.items.some(i => i.outdated) ? [{ g: 'Server', t: $('#upd-go').textContent, k: 'Claude Code, plugins', f: () => updateRun('apply'), c: 'var(--teal)' }] : []),
+    { g: 'Server', t: 'Check for updates now', k: 'Claude Code, plugins', f: () => updateRun('check'), c: 'var(--teal)' },
   ];
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-cmd]');
@@ -417,14 +458,16 @@
       case 'new': newSession(); break;
       case 'open': terminal(b.dataset.id); break;
       case 'answer': answer(b); break;
+      case 'updates-apply': updateRun('apply'); break;
     }
   });
 
   D.start({ commands, keys: { n: newSession } });
   api('/api/projects').then(p => { projects = p; }).catch(() => {});
-  load(); system();
+  load(); system(); loadUpdates();
   setInterval(load, 3000);
   setInterval(system, 30000);
+  setInterval(loadUpdates, 60000);
 })();
 </script>
 </body>

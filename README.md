@@ -46,7 +46,8 @@ needs you is lit amber.
 | **Question cards** | When Claude asks something (a choice, a permission prompt), the options appear on the card as buttons. Tap one, and the key is pressed in the session. No terminal needed. |
 | **Image drop** | Drag a screenshot onto a card, or paste it. sessiondeck stores it on the server and types its path into the Claude prompt. You press Enter. |
 | **Real terminals** | "Open terminal" gives you the full session in the browser through ttyd. Sessions live in tmux, so you can also attach from SSH at the same time. |
-| **Survives everything** | Close the browser, restart sessiondeck, lose the connection: the tmux sessions keep running and reappear. |
+| **Survives everything** | Close the browser, restart sessiondeck, lose the connection: the tmux sessions keep running and reappear. Even a crashed tmux server or a reboot: sessions come back with their conversation, see below. |
+| **Updates in view** | The side panel shows when Claude Code or one of your enabled plugins has a newer version, and installs them with one button. |
 | **Server at a glance** | CPU over the last 30 minutes, memory, disk, and how much RAM the terminals use together. |
 | **Keyboard first** | `N` starts a session, `Cmd/Ctrl+K` opens the command palette. Ending a session needs a press and hold, so nothing dies by accident. |
 
@@ -73,6 +74,22 @@ flowchart LR
 - Every 4 seconds sessiondeck reads the visible pane of each session and parses it: spinner line
   means working, a numbered menu means a question, silence means waiting or idle.
 - Answers and image paths are delivered with `tmux send-keys`. Nothing is sent to any third party.
+
+### Crash recovery
+
+sessiondeck remembers the Claude conversation id of every session and the start time of the tmux
+server. If sessions vanish because the tmux server died (a stray `tmux kill-server`, a reboot, an
+out of memory kill), they are started again with `claude --resume <id>` in the same folder, and
+their terminal comes back. A session that was in the middle of work gets a short message that it
+was restored and should check what is really done before it continues. A session you ended
+yourself with `/exit` stays off: the tmux server was still running when it disappeared.
+
+### Updates
+
+Every 30 minutes (and on demand from the command palette) sessiondeck runs
+[`check-updates.js`](check-updates.js) as the Claude Code user: the installed `claude` version
+against npm, and each enabled plugin against its marketplace. "Install updates" runs
+`claude update` and `claude plugin update` for everything outdated and shows the result.
 
 ## Quick start
 
@@ -117,7 +134,7 @@ All settings are environment variables. [`.env.example`](.env.example) lists the
 | `SESSIONDECK_TTYD_BIN` | `ttyd` | ttyd binary. |
 | `SESSIONDECK_CLAUDE_BIN` | `claude` | Claude Code binary. |
 | `SESSIONDECK_RUN_AS` | empty | Only when sessiondeck runs as root: the user that owns tmux and runs Claude Code. |
-| `SESSIONDECK_DATA_DIR` | `./data` | Session list and activity history (created with mode 0700). |
+| `SESSIONDECK_DATA_DIR` | `./data` | Session list, activity history and the last update check (created with mode 0700). |
 | `SESSIONDECK_UPLOAD_DIR` | `<data dir>/images` | Where dropped images are stored. |
 | `SESSIONDECK_NAME` | host name | Server name shown in the UI. |
 
@@ -162,7 +179,8 @@ What it does by default:
 - **No root needed.** Run it as the Claude Code user. Running as root requires an explicit
   `SESSIONDECK_RUN_AS`, and tmux then runs as that user.
 - **Private state.** Session data (0600) and dropped images (0600, in a 0700 folder) are readable
-  only by the service user.
+  only by the service user. The login password is removed from the environment at startup, so
+  tmux, Claude Code and ttyd never inherit it.
 
 Known limits, so you can decide:
 
@@ -189,14 +207,16 @@ npm test          # node:test, no extra framework
 ```
 
 The code is small on purpose: `server.js` (HTTP, tmux, ttyd), `pane.js` (reading the Claude Code
-screen), `guard.js` (validation and auth helpers) and a dependency-free UI in `public/`.
+screen), `guard.js` (validation and auth helpers), `revive.js` (crash recovery rules),
+`check-updates.js` (update check) and a dependency-free UI in `public/`.
 The only runtime dependencies are `express` and `http-proxy`.
 
 ## FAQ
 
 **Does this use the Claude API or my API key?**
-No. It runs the regular `claude` CLI, logged in however you logged it in. sessiondeck itself makes no
-calls to Anthropic or anywhere else.
+No. It runs the regular `claude` CLI, logged in however you logged it in. The only network access of
+sessiondeck itself is the update check: `npm view` for the Claude Code version and a fetch of your
+plugin marketplaces, the same sources `claude` uses.
 
 **Can several people use it?**
 It is built for one person with many sessions. There is one login, and everyone who has it can see

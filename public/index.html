@@ -131,6 +131,11 @@
         <ul class="upd log" id="upd-log"></ul>
         <button type="button" class="btn primary" id="upd-go" data-cmd="updates-apply" hidden></button>
       </div>
+      <div class="panel" id="limit" aria-live="polite" hidden>
+        <h4>5-hour limit</h4>
+        <div class="meter"><div class="row"><span>Used</span><b class="num" id="lim-v">·</b></div><div class="track"><i id="lim-t" style="transform:scaleX(0)"></i></div><small id="lim-k"></small></div>
+        <button type="button" class="btn primary" id="lim-go" data-cmd="limit-resume" hidden>Send paused sessions on</button>
+      </div>
       <div class="panel">
         <h4>Shortcuts</h4>
         <ul class="hints">
@@ -442,6 +447,28 @@
     const t = setInterval(async () => { await loadUpdates(); if (!updates.running) clearInterval(t); }, 3000);
   }
 
+  // ---------- 5-hour limit and limit pause ----------
+  let limit = {};
+  async function loadLimit() {
+    try { limit = await api('/api/limit'); } catch { return; }
+    const paused = limit.paused || [];
+    $('#limit').hidden = limit.pct == null && !paused.length;
+    $('#lim-v').textContent = limit.pct == null ? '·' : limit.pct + ' %';
+    $('#lim-t').style.transform = `scaleX(${Math.min(100, limit.pct || 0) / 100})`;
+    $('#lim-t').classList.toggle('warn', limit.pct >= 90);
+    $('#lim-k').textContent = [limit.reset && `resets ${hm(limit.reset)}`, limit.week != null && `week ${limit.week}\u00a0%`,
+      paused.length ? `${paused.length} paused` : limit.auto ? `pauses at ${limit.auto}\u00a0%` : 'automatic pause off'].filter(Boolean).join(' · ');
+    $('#lim-go').hidden = !paused.length;
+  }
+  async function limitRun(what) {
+    toast(what === 'pause' ? 'Pausing every working session' : 'Sending paused sessions on');
+    try {
+      const r = await api('/api/limit/' + what, { method: 'POST' });
+      toast(`${r.count} ${r.count === 1 ? 'session' : 'sessions'} ${what === 'pause' ? 'paused' : 'sent on'}`);
+    } catch (e) { toast(e.message, true); }
+    loadLimit();
+  }
+
   // ---------- Commands ----------
   const commands = () => [
     { g: 'Sessions', t: 'Start new session', k: 'N', f: newSession, c: 'var(--teal)' },
@@ -449,6 +476,8 @@
     ...sessions.map(s => ({ g: 'Terminals', t: `Open ${s.name} in the browser`, k: 'terminal', f: () => terminal(s.id), c: 'var(--amber)' })),
     ...(updates.items.some(i => i.outdated) ? [{ g: 'Server', t: $('#upd-go').textContent, k: 'Claude Code, plugins', f: () => updateRun('apply'), c: 'var(--teal)' }] : []),
     { g: 'Server', t: 'Check for updates now', k: 'Claude Code, plugins', f: () => updateRun('check'), c: 'var(--teal)' },
+    ...(limit.pct != null ? [{ g: 'Server', t: 'Pause all working sessions now', k: `5-hour limit ${limit.pct} %`, f: () => limitRun('pause'), c: 'var(--amber)' }] : []),
+    ...(limit.paused?.length ? [{ g: 'Server', t: 'Send paused sessions on', k: `${limit.paused.length} paused`, f: () => limitRun('resume'), c: 'var(--teal)' }] : []),
   ];
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-cmd]');
@@ -459,15 +488,17 @@
       case 'open': terminal(b.dataset.id); break;
       case 'answer': answer(b); break;
       case 'updates-apply': updateRun('apply'); break;
+      case 'limit-resume': limitRun('resume'); break;
     }
   });
 
   D.start({ commands, keys: { n: newSession } });
   api('/api/projects').then(p => { projects = p; }).catch(() => {});
-  load(); system(); loadUpdates();
+  load(); system(); loadUpdates(); loadLimit();
   setInterval(load, 3000);
   setInterval(system, 30000);
   setInterval(loadUpdates, 60000);
+  setInterval(loadLimit, 60000);
 })();
 </script>
 </body>

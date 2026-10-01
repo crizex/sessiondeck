@@ -32,6 +32,7 @@ const CONFIG = {
   dataDir: path.resolve(env.SESSIONDECK_DATA_DIR || path.join(__dirname, 'data')),
   uploadDir: env.SESSIONDECK_UPLOAD_DIR ? path.resolve(env.SESSIONDECK_UPLOAD_DIR) : '',
   name: env.SESSIONDECK_NAME || os.hostname(),
+  limitPause: Math.round(+env.SESSIONDECK_LIMIT_PAUSE || 0),
 };
 
 // Keep the password out of the environment every child inherits (tmux server, claude, ttyd).
@@ -40,6 +41,9 @@ delete env.SESSIONDECK_PASSWORD;
 if (CONFIG.password.length < 12) {
   fail('SESSIONDECK_PASSWORD is not set or shorter than 12 characters. There is no default password.\n' +
     '  Generate one, for example:  export SESSIONDECK_PASSWORD="$(openssl rand -base64 24)"');
+}
+if (env.SESSIONDECK_LIMIT_PAUSE && !(CONFIG.limitPause >= 1 && CONFIG.limitPause <= 100)) {
+  fail('SESSIONDECK_LIMIT_PAUSE must be a percent from 1 to 100, or empty to turn the limit pause off.');
 }
 if (!fs.existsSync(CONFIG.root) || !fs.statSync(CONFIG.root).isDirectory()) {
   fail(`projects root ${CONFIG.root} does not exist. Set SESSIONDECK_ROOT to your projects folder.`);
@@ -455,6 +459,36 @@ app.post('/api/updates/:what(check|apply)', (req, res) => {
   res.json({ started: true });
 });
 
+// ── Limit pause (see limit.py) ──────────────────────────────────────
+// Usage comes from the status line (statusline.sh). Runs as the user that runs Claude Code: it reads that
+// user's ~/.claude and sends keys to that user's tmux. Only the tmux names of working sessions go in.
+function runLimit(...args) {
+  const all = ['python3', path.join(__dirname, 'limit.py'), ...args];
+  const [cmd, argv] = isRoot ? ['runuser', ['-u', CONFIG.runAsUser, '--', ...all]] : [all[0], all.slice(1)];
+  const childEnv = { PATH: env.PATH, HOME: RUN_AS_HOME || os.homedir() };
+  return new Promise((resolve, reject) => execFile(cmd, argv, { env: childEnv, timeout: 120000 }, (err, out) => (err ? reject(err) : resolve(out.trim()))));
+}
+const workingIds = () => Object.values(sessions).filter(s => stateOf(s) === 'working').map(s => s.id);
+let limitBusy = false;
+async function limitRound() {
+  if (limitBusy) return;
+  limitBusy = true;
+  try { const did = await runLimit('tick', String(CONFIG.limitPause), ...workingIds()); if (did) console.log(`limit pause: ${did}`); }
+  catch (e) { console.error('limit:', e.message); }
+  finally { limitBusy = false; }
+}
+
+app.get('/api/limit', async (req, res) => {
+  try { res.json({ ...JSON.parse(await runLimit('status')), auto: CONFIG.limitPause }); }
+  catch (e) { console.error('limit:', e.message); res.status(500).json({ error: 'limit status unavailable' }); }
+});
+
+app.post('/api/limit/:what(pause|resume)', async (req, res) => {
+  const what = req.params.what;
+  try { res.json({ count: Number(await runLimit(what, ...(what === 'pause' ? workingIds() : []))) }); }
+  catch (e) { console.error('limit:', e.message); res.status(500).json({ error: `limit ${what} failed` }); }
+});
+
 app.post('/api/sessions', async (req, res) => {
   const { name, cwd, resume } = req.body || {};
   if (resume != null && !(typeof resume === 'string' && UUID_RE.test(resume))) {
@@ -589,6 +623,7 @@ cpuSample(); setTimeout(cpuSample, 2000); setInterval(cpuSample, 60000);
 peekRound(); setInterval(peekRound, 4000);
 setInterval(saveActivity, 60000);
 setTimeout(runUpdates, 30000); setInterval(runUpdates, 30 * 60 * 1000);
+if (CONFIG.limitPause) setInterval(limitRound, 60000);
 
 server.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`sessiondeck listening on http://${CONFIG.host}:${CONFIG.port}`);

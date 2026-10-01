@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.0
+
+**5-hour limit**
+- New side panel "5-hour limit": how much is used, when it resets and the weekly share. Hidden until the numbers
+  exist.
+- The numbers come from Claude Code's status line. The new `statusline.sh` writes them to
+  `~/.claude/sessiondeck-usage.json`; no extra API calls, no tokens.
+
+**Limit pause**
+- `SESSIONDECK_LIMIT_PAUSE=90` (off by default): at that percent every working session stops (Escape, background
+  agents included), and after the reset each one gets a note to continue where it was. Once per limit window.
+- Command palette: "Pause all working sessions now" and "Send paused sessions on", plus a button in the panel
+  while sessions are paused. New API `GET /api/limit`, `POST /api/limit/pause` and `/api/limit/resume`, behind the
+  login and the same-origin check like every other write.
+- In root mode it runs as `SESSIONDECK_RUN_AS`, with a minimal environment.
+
+**Fix**
+- Question cards: a question inside a box no longer starts with the frame bar (`│ Did it work?`).
+
 ## 1.1.0
 
 **Crash recovery**

@@ -28,7 +28,8 @@ function readMenu(lines) {
     }
   }
   const text = lines.slice(0, start).findLast(l => l.trim() && !/^\s*☐/.test(l) && !/^─{10,}/.test(l));
-  return { text: (text || '').trim(), options };
+  // Inside a box the line starts and ends with a frame bar: not part of the question.
+  return { text: (text || '').replace(/^\s*[│|]\s*|\s*[│|]\s*$/g, '').trim(), options };
 }
 
 function readPane(raw) {

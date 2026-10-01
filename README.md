@@ -48,6 +48,7 @@ needs you is lit amber.
 | **Real terminals** | "Open terminal" gives you the full session in the browser through ttyd. Sessions live in tmux, so you can also attach from SSH at the same time. |
 | **Survives everything** | Close the browser, restart sessiondeck, lose the connection: the tmux sessions keep running and reappear. Even a crashed tmux server or a reboot: sessions come back with their conversation, see below. |
 | **Updates in view** | The side panel shows when Claude Code or one of your enabled plugins has a newer version, and installs them with one button. |
+| **5-hour limit** | Your Claude.ai usage in the side panel, with the reset time and the weekly share. The optional limit pause stops every working session near the limit and sends it on after the reset, see below. |
 | **Server at a glance** | CPU over the last 30 minutes, memory, disk, and how much RAM the terminals use together. |
 | **Keyboard first** | `N` starts a session, `Cmd/Ctrl+K` opens the command palette. Ending a session needs a press and hold, so nothing dies by accident. |
 
@@ -90,6 +91,25 @@ Every 30 minutes (and on demand from the command palette) sessiondeck runs
 [`check-updates.js`](check-updates.js) as the Claude Code user: the installed `claude` version
 against npm, and each enabled plugin against its marketplace. "Install updates" runs
 `claude update` and `claude plugin update` for everything outdated and shows the result.
+
+### Limit pause
+
+Claude Code's status line knows how much of your 5-hour limit is used (Claude.ai subscriptions only).
+[`statusline.sh`](statusline.sh) writes those numbers to `~/.claude/sessiondeck-usage.json`, which costs no
+API calls. Install it for the user that runs Claude Code (needs `jq`):
+
+```bash
+cp statusline.sh ~/.claude/statusline.sh && chmod +x ~/.claude/statusline.sh
+# then in ~/.claude/settings.json:
+#   "statusLine": { "type": "command", "command": "~/.claude/statusline.sh" }
+```
+
+The side panel then shows the usage. With `SESSIONDECK_LIMIT_PAUSE=90`, sessiondeck checks every minute:
+at 90 % every working session stops (Escape, background agents too), and once the limit has reset each one gets a
+note to continue where it was. Only once per limit window, so whatever you start afterwards may use the rest.
+The command palette has "Pause all working sessions now" and "Send paused sessions on" for doing it by hand.
+[SessionDeck Desktop](https://github.com/crizex/sessiondeck-desktop) reads the same state file and shows the
+same paused sessions; turn the automatic pause on in one of the two only.
 
 ## Quick start
 
@@ -137,6 +157,7 @@ All settings are environment variables. [`.env.example`](.env.example) lists the
 | `SESSIONDECK_DATA_DIR` | `./data` | Session list, activity history and the last update check (created with mode 0700). |
 | `SESSIONDECK_UPLOAD_DIR` | `<data dir>/images` | Where dropped images are stored. |
 | `SESSIONDECK_NAME` | host name | Server name shown in the UI. |
+| `SESSIONDECK_LIMIT_PAUSE` | empty (off) | Percent of the 5-hour limit (1 to 100) at which working sessions stop until the reset. Needs `statusline.sh`, see [Limit pause](#limit-pause). |
 
 ## Behind a reverse proxy
 

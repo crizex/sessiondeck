@@ -66,3 +66,8 @@ test('running background shell counts as working', () => {
   const onlyBelow = readPane(`Done.\n${RULE}\n❯ \n${RULE}\n  ⏵⏵ bypass permissions on · 2 shells · ← for agents\n`);
   assert.strictEqual(onlyBelow.working, true);
 });
+
+test('frame bar around the question is dropped', () => {
+  const p = readPane('│ Did the push arrive? │\n❯ 1. Yes\n  2. No\n\nEnter to select\n');
+  assert.strictEqual(p.question.text, 'Did the push arrive?');
+});

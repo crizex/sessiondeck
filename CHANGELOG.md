@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+**Fix**
+- Server panel: "terminals together" now counts the memory of everything running inside the sessions (Claude Code,
+  Node, builds below the tmux server) plus ttyd. Before it only counted ttyd itself and showed about 0.0 GB.
+
 ## 1.2.0
 
 **5-hour limit**

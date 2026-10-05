@@ -1,6 +1,6 @@
 {
   "name": "sessiondeck",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Web cockpit for Claude Code sessions on your own server: tmux + ttyd, question cards, image drop.",
   "license": "MIT",
   "main": "server.js",

@@ -428,11 +428,20 @@ app.get('/api/system', (req, res) => {
     const mem = Object.fromEntries(fs.readFileSync('/proc/meminfo', 'utf8').split('\n')
       .map(l => /^(\w+):\s+(\d+)/.exec(l)).filter(Boolean).map(m => [m[1], +m[2] * 1024]));
     const disk = fs.statfsSync(CONFIG.root);
-    // Summed RSS of all ttyd processes (ps reports KB).
+    // Summed RSS of ttyd plus everything below the tmux server (claude, node, builds); ps reports KB.
     let sessionRamBytes = 0;
     try {
-      sessionRamBytes = execFileSync('ps', ['-C', 'ttyd', '-o', 'rss='], { stdio: ['ignore', 'pipe', 'ignore'] })
-        .toString().split('\n').reduce((sum, v) => sum + (+v || 0), 0) * 1024;
+      const procs = execFileSync('ps', ['-eo', 'pid=,ppid=,rss=,comm='], { stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString().trim().split('\n').map(l => {
+          const [pid, ppid, rss, ...comm] = l.trim().split(/\s+/);
+          return { pid, ppid, rss: +rss || 0, comm: comm.join(' ') };
+        });
+      const inTree = new Set(procs.filter(p => p.comm.startsWith('tmux: server')).map(p => p.pid));
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const p of procs) if (!inTree.has(p.pid) && inTree.has(p.ppid)) { inTree.add(p.pid); grew = true; }
+      }
+      sessionRamBytes = procs.filter(p => inTree.has(p.pid) || p.comm === 'ttyd').reduce((sum, p) => sum + p.rss, 0) * 1024;
     } catch {}
     res.json({
       name: CONFIG.name, cores: os.cpus().length,

@@ -15,7 +15,7 @@ const QUESTION_RE = /Enter to select|Enter to confirm|Do you want to|Would you l
 const OPTION_RE = /^\s*(?:❯\s*)?(\d+)\.\s+(.+)$/;
 
 // Menu read from the bottom: the last "1." and every following number in sequence.
-// The question is the line before it.
+// The question is the text block before it.
 function readMenu(lines) {
   const start = lines.findLastIndex(l => OPTION_RE.exec(l)?.[1] === '1');
   if (start < 0) return null;
@@ -27,9 +27,16 @@ function readMenu(lines) {
       options.push({ nr: +m[1], text, freeText: /^Type something\.?$/.test(text) });
     }
   }
-  const text = lines.slice(0, start).findLast(l => l.trim() && !/^\s*☐/.test(l) && !/^─{10,}/.test(l));
-  // Inside a box the line starts and ends with a frame bar: not part of the question.
-  return { text: (text || '').replace(/^\s*[│|]\s*|\s*[│|]\s*$/g, '').trim(), options };
+  // Question = the block of text right above the menu; the terminal wraps long questions over several lines.
+  const block = [];
+  for (const l of lines.slice(0, start).reverse()) {
+    // Inside a box the line starts and ends with a frame bar: not part of the question.
+    const t = l.replace(/^\s*[│|]\s*|\s*[│|]\s*$/g, '').trim();
+    if (!t) { if (block.length) break; continue; }
+    if (/^\s*☐/.test(l) || /^─{10,}/.test(l)) break;
+    block.unshift(t);
+  }
+  return { text: block.join(' '), options };
 }
 
 function readPane(raw) {

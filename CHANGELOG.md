@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+**Fix**
+- Long questions from AskUserQuestion now arrive in full. The terminal wraps a long question over several lines,
+  and only the last line ended up on the card (for example just "are online?").
+
 ## 1.2.1
 
 **Fix**

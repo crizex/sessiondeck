@@ -71,3 +71,8 @@ test('frame bar around the question is dropped', () => {
   const p = readPane('│ Did the push arrive? │\n❯ 1. Yes\n  2. No\n\nEnter to select\n');
   assert.strictEqual(p.question.text, 'Did the push arrive?');
 });
+
+test('a wrapped question arrives in full', () => {
+  const p = readPane(' ☐ Guest access\n\nShould the router send guests to the page automatically as soon as they\nare online?\n\n❯ 1. Yes\n  2. No\n\nEnter to select\n');
+  assert.strictEqual(p.question.text, 'Should the router send guests to the page automatically as soon as they are online?');
+});

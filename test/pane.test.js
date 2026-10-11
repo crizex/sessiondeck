@@ -11,13 +11,21 @@ test('selection menu yields question and options', () => {
   assert.deepStrictEqual(p.question, {
     text: 'Which color should the button have?',
     options: [
-      { nr: 1, text: 'Red (warm)', freeText: false },
-      { nr: 2, text: 'Blue (cool)', freeText: false },
-      { nr: 3, text: 'Green (fresh)', freeText: false },
+      { nr: 1, text: 'Red (warm)', freeText: false, description: 'A warm, energetic tone' },
+      { nr: 2, text: 'Blue (cool)', freeText: false, description: 'A cool, calm tone' },
+      { nr: 3, text: 'Green (fresh)', freeText: false, description: 'A fresh, natural tone' },
       { nr: 4, text: 'Type something.', freeText: true },
       { nr: 5, text: 'Chat about this', freeText: false },
     ],
   });
+});
+
+test('a wrapped option description becomes one line', () => {
+  const p = readPane('How much?\n\n❯ 1. Build all\n     Build everything new and\n     deploy it.\n  2. Only new\n\nEnter to select\n');
+  assert.deepStrictEqual(p.question.options, [
+    { nr: 1, text: 'Build all', freeText: false, description: 'Build everything new and deploy it.' },
+    { nr: 2, text: 'Only new', freeText: false },
+  ]);
 });
 
 test('pane without menu: no question, even with a numbered list in the text', () => {

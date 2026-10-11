@@ -307,9 +307,18 @@ async function peekRound() {
     peek[s.id] = next;
     if (s.wasWorking !== next.working) { s.wasWorking = next.working; save = true; }
     // Nudge a revived session once its conversation has loaded: screen still, not working, no question.
+    // A session started with a task may first ask whether to trust the folder; the folder is already
+    // confined to the configured root, so pick "Yes" instead of waiting forever.
+    if (s.task && !s.trusted && /Yes, I trust this folder/.test(text)) {
+      s.trusted = true;
+      await tmuxAsync(['send-keys', '-t', s.id, 'Down']);
+      await tmuxAsync(['send-keys', '-t', s.id, 'Enter']);
+      s.nudgeAt = now; // loading time starts again
+    }
     if (s.nudgeAt && now - s.nudgeAt > 20000 && old?.text === text && !next.working && !next.asking) {
       delete s.nudgeAt;
-      await tmuxAsync(['send-keys', '-t', s.id, '-l', NUDGE]);
+      await tmuxAsync(['send-keys', '-t', s.id, '-l', s.task || NUDGE]);
+      delete s.task;
       await tmuxAsync(['send-keys', '-t', s.id, 'Enter']);
       console.log(`[revive] ${s.id} nudged`);
     }
@@ -499,13 +508,19 @@ app.post('/api/limit/:what(pause|resume)', async (req, res) => {
 });
 
 app.post('/api/sessions', async (req, res) => {
-  const { name, cwd, resume } = req.body || {};
+  const { name, cwd, resume, task } = req.body || {};
   if (resume != null && !(typeof resume === 'string' && UUID_RE.test(resume))) {
     return res.status(400).json({ error: 'resume must be a conversation uuid' });
   }
   if (cwd != null && typeof cwd !== 'string') return res.status(400).json({ error: 'invalid cwd' });
+  // task: first input, typed once Claude is ready. One line, because send-keys submits at the first newline.
+  if (task != null && !(typeof task === 'string' && task.trim() && task.length <= 2000 && !/[\r\n]/.test(task))) {
+    return res.status(400).json({ error: 'task must be one line of at most 2000 characters' });
+  }
   try {
-    res.json(publicSession(await createSession(name, cwd, resume)));
+    const session = await createSession(name, cwd, resume);
+    if (task) Object.assign(session, { task, nudgeAt: Date.now() });
+    res.json(publicSession(session));
   } catch (err) {
     console.error('createSession:', err.message);
     const known = /working directory/.test(err.message);

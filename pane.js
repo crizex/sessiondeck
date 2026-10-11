@@ -20,11 +20,17 @@ function readMenu(lines) {
   const start = lines.findLastIndex(l => OPTION_RE.exec(l)?.[1] === '1');
   if (start < 0) return null;
   const options = [];
+  let last = null; // option that indented follow-up lines (description, possibly wrapped) attach to
   for (const l of lines.slice(start)) {
     const m = OPTION_RE.exec(l);
     if (m && +m[1] === options.length + 1) {
       const text = m[2].trim();
-      options.push({ nr: +m[1], text, freeText: /^Type something\.?$/.test(text) });
+      last = { nr: +m[1], text, freeText: /^Type something\.?$/.test(text) };
+      options.push(last);
+    } else if (last && /^ {3,}\S/.test(l)) {
+      last.description = last.description ? `${last.description} ${l.trim()}` : l.trim();
+    } else {
+      last = null;
     }
   }
   // Question = the block of text right above the menu; the terminal wraps long questions over several lines.

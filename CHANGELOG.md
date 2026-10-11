@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0
+
+**Question cards**
+- Option descriptions from AskUserQuestion are now read: indented lines under an option (wrapped lines joined)
+  arrive as `description` on that entry of `question.options`. Options without a description are unchanged.
+
+**API**
+- `POST /api/sessions` takes an optional `task` (one line, at most 2000 characters). It is typed as the first
+  input once Claude has loaded, the same way a revived session gets its note. A session started with a task
+  that stops at the "trust this folder" question picks "Yes" on its own (the folder is already limited to the
+  configured root).
+
 ## 1.2.2
 
 **Fix**
